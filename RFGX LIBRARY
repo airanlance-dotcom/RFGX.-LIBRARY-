@@ -1,0 +1,521 @@
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RFGX_UI_Library"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- Compact Medium-Small Window Box (430 x 260) with Icon Sidebar
+local Box = Instance.new("Frame")
+Box.Name = "RFGXBox"
+Box.Size = UDim2.new(0, 430, 0, 260)
+Box.Position = UDim2.new(0.5, -215, 0.5, -130)
+Box.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Box.BackgroundTransparency = 0.05
+Box.BorderSizePixel = 0
+Box.ClipsDescendants = true
+Box.Parent = ScreenGui
+
+-- Rounded Corners (6px radius)
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 6)
+UICorner.Parent = Box
+
+-- Outer Border Outline
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(45, 45, 45)
+UIStroke.Thickness = 1
+UIStroke.Parent = Box
+
+-- ================= NOTIFICATION SYSTEM (Battery Charging Bar & Queue) =================
+local NotifContainer = Instance.new("ScreenGui")
+NotifContainer.Name = "RFGX_Notifications"
+NotifContainer.Parent = game:GetService("CoreGui")
+
+local notifQueue = {}
+local isNotifActive = false
+
+local function ProcessNotificationQueue()
+    if isNotifActive or #notifQueue == 0 then return end
+    isNotifActive = true
+    
+    local notifData = table.remove(notifQueue, 1)
+    local titleText = notifData.title
+    local messageText = notifData.msg
+
+    -- Main Box (Bottom-Right)
+    local NotifBox = Instance.new("Frame")
+    NotifBox.Size = UDim2.new(0, 240, 0, 65)
+    NotifBox.Position = UDim2.new(1, -250, 1, -80)
+    NotifBox.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    NotifBox.BorderSizePixel = 0
+    NotifBox.ZIndex = 20
+    NotifBox.Parent = NotifContainer
+
+    local NotifStroke = Instance.new("UIStroke")
+    NotifStroke.Color = Color3.fromRGB(60, 60, 60)
+    NotifStroke.Thickness = 1
+    NotifStroke.Parent = NotifBox
+
+    -- Title Label
+    local TitleLbl = Instance.new("TextLabel")
+    TitleLbl.Size = UDim2.new(1, -30, 0, 20)
+    TitleLbl.Position = UDim2.new(0, 8, 0, 6)
+    TitleLbl.BackgroundTransparency = 1
+    TitleLbl.Text = titleText
+    TitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleLbl.Font = Enum.Font.GothamBold
+    TitleLbl.TextSize = 12
+    TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLbl.ZIndex = 21
+    TitleLbl.Parent = NotifBox
+
+    -- Message Label
+    local MsgLbl = Instance.new("TextLabel")
+    MsgLbl.Size = UDim2.new(1, -16, 0, 24)
+    MsgLbl.Position = UDim2.new(0, 8, 0, 26)
+    MsgLbl.BackgroundTransparency = 1
+    MsgLbl.Text = messageText
+    MsgLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    MsgLbl.Font = Enum.Font.Gotham
+    MsgLbl.TextSize = 11
+    MsgLbl.TextXAlignment = Enum.TextXAlignment.Left
+    MsgLbl.TextWrapped = true
+    MsgLbl.ZIndex = 21
+    MsgLbl.Parent = NotifBox
+
+    -- Queue Badge Number (if more notifications are waiting behind)
+    if #notifQueue > 0 then
+        local Badge = Instance.new("TextLabel")
+        Badge.Size = UDim2.new(0, 22, 0, 16)
+        Badge.Position = UDim2.new(1, -48, 0, 6)
+        Badge.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Badge.Text = "+" .. tostring(#notifQueue)
+        Badge.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Badge.Font = Enum.Font.GothamBold
+        Badge.TextSize = 10
+        Badge.ZIndex = 22
+        Badge.Parent = NotifBox
+        
+        local BadgeCorner = Instance.new("UICorner")
+        BadgeCorner.CornerRadius = UDim.new(1, 0)
+        BadgeCorner.Parent = Badge
+    end
+
+    -- Top Right [X] Close Button
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+    CloseBtn.Position = UDim2.new(1, -22, 0, 4)
+    CloseBtn.BackgroundTransparency = 1
+    CloseBtn.Text = "X"
+    CloseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 12
+    CloseBtn.ZIndex = 22
+    CloseBtn.Parent = NotifBox
+
+    -- Red Battery Charging Bar (Starts at 0 width, grows up to full 100%)
+    local RedBarTrack = Instance.new("Frame")
+    RedBarTrack.Size = UDim2.new(1, 0, 0, 3)
+    RedBarTrack.Position = UDim2.new(0, 0, 1, -3)
+    RedBarTrack.BackgroundColor3 = Color3.fromRGB(50, 20, 20)
+    RedBarTrack.BorderSizePixel = 0
+    RedBarTrack.ZIndex = 21
+    RedBarTrack.Parent = NotifBox
+
+    local RedBarFill = Instance.new("Frame")
+    RedBarFill.Size = UDim2.new(0, 0, 1, 0) -- Starts empty
+    RedBarFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    RedBarFill.BorderSizePixel = 0
+    RedBarFill.ZIndex = 22
+    RedBarFill.Parent = RedBarTrack
+
+    local dismissed = false
+    local function dismiss()
+        if dismissed then return end
+        dismissed = true
+        if NotifBox and NotifBox.Parent then
+            NotifBox:TweenPosition(UDim2.new(1, 20, 1, -80), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.2, true, function()
+                NotifBox:Destroy()
+                isNotifActive = false
+                task.wait(0.3)
+                ProcessNotificationQueue()
+            end)
+        end
+    end
+
+    CloseBtn.MouseButton1Click:Connect(dismiss)
+
+    -- Battery Bar Charging Up to Full (3 seconds duration)
+    RedBarFill:TweenSize(UDim2.new(1, 0, 1, 0), Enum.EasingDirection.Linear, Enum.EasingStyle.Linear, 3, true, function()
+        dismiss()
+    end)
+end
+
+local function SendNotification(titleText, messageText)
+    table.insert(notifQueue, {title = titleText, msg = messageText})
+    ProcessNotificationQueue()
+end
+
+-- ================= TOP HEADER BAR & DRAGGING =================
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 36)
+TopBar.Position = UDim2.new(0, 0, 0, 0)
+TopBar.BackgroundTransparency = 1
+TopBar.ZIndex = 2
+TopBar.Parent = Box
+
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Box.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Box.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Main Menu Title
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(0, 160, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "RFGX"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 15
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 2
+Title.Parent = TopBar
+
+-- SubTitle next to Title
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Name = "SubTitle"
+SubTitle.Size = UDim2.new(0, 160, 1, 0)
+SubTitle.Position = UDim2.new(0, 65, 0, 0)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "|  Library"
+SubTitle.TextColor3 = Color3.fromRGB(140, 140, 140)
+SubTitle.TextSize = 12
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.ZIndex = 2
+SubTitle.Parent = TopBar
+
+-- Top-Right Minimize Button (-)
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Size = UDim2.new(0, 26, 0, 26)
+MinimizeButton.AnchorPoint = Vector2.new(1, 0.5)
+MinimizeButton.Position = UDim2.new(1, -8, 0.5, 0)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+MinimizeButton.BorderColor3 = Color3.fromRGB(50, 50, 50)
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeButton.TextSize = 16
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.ZIndex = 2
+MinimizeButton.Parent = TopBar
+
+local MinButtonCorner = Instance.new("UICorner")
+MinButtonCorner.CornerRadius = UDim.new(0, 4)
+MinButtonCorner.Parent = MinimizeButton
+
+-- White Horizontal Divider Line
+local HeaderLine = Instance.new("Frame")
+HeaderLine.Name = "HeaderLine"
+HeaderLine.Size = UDim2.new(1, 0, 0, 1)
+HeaderLine.Position = UDim2.new(0, 0, 1, 0)
+HeaderLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+HeaderLine.BackgroundTransparency = 0.75
+HeaderLine.BorderSizePixel = 0
+HeaderLine.ZIndex = 2
+HeaderLine.Parent = TopBar
+
+-- Main Content Container
+local ContentMain = Instance.new("Frame")
+ContentMain.Name = "ContentMain"
+ContentMain.Size = UDim2.new(1, 0, 1, -36)
+ContentMain.Position = UDim2.new(0, 0, 0, 36)
+ContentMain.BackgroundTransparency = 1
+ContentMain.ZIndex = 2
+ContentMain.Parent = Box
+
+local isMinimized = false
+MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        ContentMain.Visible = false
+        Box:TweenSize(UDim2.new(0, 430, 0, 36), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        MinimizeButton.Text = "+"
+    else
+        Box:TweenSize(UDim2.new(0, 430, 0, 260), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        task.wait(0.1)
+        ContentMain.Visible = true
+        MinimizeButton.Text = "-"
+    end
+end)
+
+-- ================= ICON SIDEBAR & TAB MANAGEMENT =================
+local SIDEBAR_WIDTH = 46
+local TabSidebar = Instance.new("Frame")
+TabSidebar.Name = "TabSidebar"
+TabSidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, 0)
+TabSidebar.Position = UDim2.new(0, 0, 0, 0)
+TabSidebar.BackgroundTransparency = 1
+TabSidebar.ZIndex = 2
+TabSidebar.Parent = ContentMain
+
+local TabLine = Instance.new("Frame")
+TabLine.Name = "TabLine"
+TabLine.Size = UDim2.new(0, 1, 1, 0)
+TabLine.Position = UDim2.new(1, 0, 0, 0)
+TabLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TabLine.BackgroundTransparency = 0.75
+TabLine.BorderSizePixel = 0
+TabLine.ZIndex = 2
+TabLine.Parent = TabSidebar
+
+local TabList = Instance.new("ScrollingFrame")
+TabList.Name = "TabList"
+TabList.Size = UDim2.new(1, 0, 1, -8)
+TabList.Position = UDim2.new(0, 0, 0, 4)
+TabList.BackgroundTransparency = 1
+TabList.BorderSizePixel = 0
+TabList.ScrollBarThickness = 0
+TabList.ZIndex = 2
+TabList.Parent = TabSidebar
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 6)
+TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabListLayout.Parent = TabList
+
+local TabListPadding = Instance.new("UIPadding")
+TabListPadding.PaddingTop = UDim.new(0, 4)
+TabListPadding.Parent = TabList
+
+-- Content Area (Right Side)
+local ContentArea = Instance.new("Frame")
+ContentArea.Name = "ContentArea"
+ContentArea.Size = UDim2.new(1, -SIDEBAR_WIDTH, 1, 0)
+ContentArea.Position = UDim2.new(0, SIDEBAR_WIDTH, 0, 0)
+ContentArea.BackgroundTransparency = 1
+ContentArea.ZIndex = 2
+ContentArea.Parent = ContentMain
+
+local allTabButtons = {}
+local allPages = {}
+
+local AddTab
+
+AddTab = function(iconInput, tabTitle)
+    local TabBtn = Instance.new("ImageButton")
+    TabBtn.Size = UDim2.new(0, 34, 0, 34)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    TabBtn.BorderSizePixel = 0
+    TabBtn.ZIndex = 2
+    
+    if type(iconInput) == "string" then
+        TabBtn.Image = iconInput
+    else
+        TabBtn.Image = "rbxthumb://type=Asset&id=" .. tostring(iconInput) .. "&w=150&h=150"
+    end
+    
+    TabBtn.ImageColor3 = Color3.fromRGB(150, 150, 150)
+    TabBtn.Parent = TabList
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = TabBtn
+
+    -- Page Container
+    local Page = Instance.new("ScrollingFrame")
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.BackgroundTransparency = 1
+    Page.BorderSizePixel = 0
+    Page.ScrollBarThickness = 3
+    Page.ZIndex = 2
+    Page.Visible = false
+    Page.Parent = ContentArea
+
+    local PageLayout = Instance.new("UIListLayout")
+    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageLayout.Padding = UDim.new(0, 6)
+    PageLayout.Parent = Page
+
+    local PagePadding = Instance.new("UIPadding")
+    PagePadding.PaddingTop = UDim.new(0, 10)
+    PagePadding.PaddingLeft = UDim.new(0, 10)
+    PagePadding.PaddingRight = UDim.new(0, 10)
+    PagePadding.Parent = Page
+
+    -- Per-Tab Delete Button (Instant Deletion)
+    local DeleteBtn = Instance.new("TextButton")
+    DeleteBtn.Size = UDim2.new(0, 20, 0, 20)
+    DeleteBtn.AnchorPoint = Vector2.new(1, 0)
+    DeleteBtn.Position = UDim2.new(1, 0, 0, -2)
+    DeleteBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    DeleteBtn.BorderSizePixel = 0
+    DeleteBtn.Text = "X"
+    DeleteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DeleteBtn.Font = Enum.Font.GothamBold
+    DeleteBtn.TextSize = 10
+    DeleteBtn.ZIndex = 5
+    DeleteBtn.Parent = Page
+
+    local DelCorner = Instance.new("UICorner")
+    DelCorner.CornerRadius = UDim.new(0, 4)
+    DelCorner.Parent = DeleteBtn
+
+    DeleteBtn.MouseButton1Click:Connect(function()
+        TabBtn:Destroy()
+        Page:Destroy()
+        SendNotification("Tab Deleted", (tabTitle or "Tab") .. " was successfully deleted.")
+        
+        for i, p in ipairs(allPages) do
+            if p == Page then
+                table.remove(allPages, i)
+                table.remove(allTabButtons, i)
+                break
+            end
+        end
+        if allPages[1] then
+            allPages[1].Visible = true
+            allTabButtons[1].BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            allTabButtons[1].ImageColor3 = Color3.fromRGB(255, 255, 255)
+        end
+    end)
+
+    table.insert(allTabButtons, TabBtn)
+    table.insert(allPages, Page)
+
+    if #allPages == 1 then
+        Page.Visible = true
+        TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        TabBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    end
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, p in ipairs(allPages) do p.Visible = false end
+        for _, t in ipairs(allTabButtons) do
+            t.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+            t.ImageColor3 = Color3.fromRGB(150, 150, 150)
+        end
+        Page.Visible = true
+        TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        TabBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+
+    return Page
+end
+
+-- ================= CREATE DEFAULT TABS =================
+local HomeTab = AddTab("rbxassetid://14456045412", "Home")      -- Home
+local CombatTab = AddTab("rbxassetid://4391741881", "Combat")     -- Combat
+local CustomTab = AddTab("rbxassetid://97347592181196", "Custom") -- Custom Tab
+local EspTab = AddTab("rbxassetid://125083051256227", "ESP")      -- ESP
+local SettingsTab = AddTab("rbxassetid://134515081025675", "Settings") -- Settings
+
+-- ================= ADD `+` TAB BUTTON IN SIDEBAR =================
+local AddTabBtn = Instance.new("TextButton")
+AddTabBtn.Size = UDim2.new(0, 34, 0, 34)
+AddTabBtn.BackgroundColor3 = Color3.fromRGB(25, 35, 25)
+AddTabBtn.BorderSizePixel = 0
+AddTabBtn.Text = "+"
+AddTabBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+AddTabBtn.Font = Enum.Font.GothamBold
+AddTabBtn.TextSize = 18
+AddTabBtn.ZIndex = 2
+AddTabBtn.Parent = TabList
+
+local AddTabCorner = Instance.new("UICorner")
+AddTabCorner.CornerRadius = UDim.new(0, 6)
+AddTabCorner.Parent = AddTabBtn
+
+AddTabBtn.MouseButton1Click:Connect(function()
+    AddTab(9405931596, "New Tab")
+    SendNotification("Tab Created", "New tab added successfully!")
+end)
+
+-- ================= SETTINGS TAB (Tab Creator Only) =================
+local CreateTabHeader = Instance.new("TextLabel")
+CreateTabHeader.Size = UDim2.new(1, 0, 0, 28)
+CreateTabHeader.BackgroundTransparency = 1
+CreateTabHeader.Text = "Create Custom Tab:"
+CreateTabHeader.TextColor3 = Color3.fromRGB(200, 200, 200)
+CreateTabHeader.Font = Enum.Font.GothamBold
+CreateTabHeader.TextSize = 12
+CreateTabHeader.TextXAlignment = Enum.TextXAlignment.Left
+CreateTabHeader.ZIndex = 2
+CreateTabHeader.Parent = SettingsTab
+
+local TabNameBox = Instance.new("TextBox")
+TabNameBox.Size = UDim2.new(1, 0, 0, 32)
+TabNameBox.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+TabNameBox.BorderSizePixel = 0
+TabNameBox.PlaceholderText = "Enter tab name..."
+TabNameBox.Text = ""
+TabNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TabNameBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 130)
+TabNameBox.Font = Enum.Font.GothamMedium
+TabNameBox.TextSize = 12
+TabNameBox.ZIndex = 2
+TabNameBox.Parent = SettingsTab
+
+local TabNameCorner = Instance.new("UICorner")
+TabNameCorner.CornerRadius = UDim.new(0, 6)
+TabNameCorner.Parent = TabNameBox
+
+local CreateTabBtn = Instance.new("TextButton")
+CreateTabBtn.Size = UDim2.new(1, 0, 0, 32)
+CreateTabBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+CreateTabBtn.BorderSizePixel = 0
+CreateTabBtn.Text = "Add New Tab"
+CreateTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CreateTabBtn.Font = Enum.Font.GothamBold
+CreateTabBtn.TextSize = 12
+CreateTabBtn.ZIndex = 2
+CreateTabBtn.Parent = SettingsTab
+
+local CreateBtnCorner = Instance.new("UICorner")
+CreateBtnCorner.CornerRadius = UDim.new(0, 6)
+CreateBtnCorner.Parent = CreateTabBtn
+
+CreateTabBtn.MouseButton1Click:Connect(function()
+    local name = TabNameBox.Text
+    if name == "" then name = "Custom" end
+    AddTab(9405931596, name)
+    TabNameBox.Text = ""
+    SendNotification("Tab Created", "Successfully created tab: " .. name)
+end)
+
+-- Send Welcome Notification on Load!
+task.spawn(function()
+    task.wait(0.5)
+    SendNotification("Welcome to RFGX", "Menu loaded successfully. Enjoy your session!")
+end)
+
+print("RFGX UI Library loaded successfully!")
